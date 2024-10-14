@@ -255,6 +255,7 @@ if __name__ == '__main__':
     parser.add_argument("--npt", type=int, default=4, help="number of observations per curve")
     parser.add_argument("--nstars", type=int, default=200, help="number of stars")
     parser.add_argument("--seed", type=int, default=123, help="random seed")
+    parser.add_argument("--par", nargs=5, type=float, default=None, help="number of observations per curve")
     parser.add_argument("--binary", action='store_true', help="do the binary samples")
     
     args = parser.parse_args()
@@ -263,14 +264,22 @@ if __name__ == '__main__':
     Nstars = args.nstars
     vel_err = 0.5
     Nsamp = 1000
-    
-    vel_disp = DISP_PRIOR
-    mean_logper = 2.1#0.5
-    std_logper = 2.0#0.2
     min_per = 0.1
     max_per = 10
-    bin_frac = 0.6
     
+    if args.par is None:
+        mean_logper = 2.1
+        std_logper = 2.0
+        bin_frac = 0.6
+        vel_mean = 0.0
+        vel_disp = DISP_PRIOR
+    else:
+        mean_logper = args.par[0]
+        std_logper = args.par[1]
+        bin_frac = args.par[2]
+        vel_mean = args.par[3]
+        vel_disp = args.par[4]
+
     seed = args.seed
     #path = VERA+'v/Test/Sinusoid/sines%iper_0.8muT_seed%i/'%(Npt, seed)
     path = args.headfolder+"/" +args.name + '_seed%i/'%seed # folder for binary samps
