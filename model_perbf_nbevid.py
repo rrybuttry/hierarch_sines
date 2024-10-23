@@ -66,7 +66,6 @@ def make_samp(Nstars,
               max_per=10,
               mean_logper = 2.4,
               std_logper = 2.28,
-              vel_mean=0.0,
               vel_disp=5,
               vel_err=0.5,
               seed=44):
@@ -77,7 +76,7 @@ def make_samp(Nstars,
     
     #per = 10**rng.uniform(np.log10(min_per), np.log10(max_per), size=Nstars)
     phase = rng.uniform(0, 2 * np.pi, size=Nstars)
-    v0 = rng.normal(size=Nstars) * vel_disp + vel_mean
+    v0 = rng.normal(size=Nstars) * vel_disp
     cosi = rng.uniform(0, 1, size=Nstars)
     sini = np.sqrt(1 - cosi**2)
     amp0 = VREF / per**(1. / 3) * sini
@@ -198,7 +197,7 @@ def hierarch_like(p, prefix, prefix_nb, nsamp=1000, seed=12, min_per=0.1, max_pe
     Hierarchical likelihood
     """
     #meanper,  binfrac = p
-    meanper, stdper, binfrac, meanvel, sigvel = p
+    meanper, stdper, binfrac = p
     
     if binfrac>=1 or binfrac<=0 or np.abs(meanper)>10 or stdper<0 or stdper > 10:
         return -1e100
@@ -263,9 +262,6 @@ def hierarch_like(p, prefix, prefix_nb, nsamp=1000, seed=12, min_per=0.1, max_pe
     
     # extract samples from cache
     PER = si.cache_per
-    VEL_bin = si.cache_vel_bin
-    VEL_nbin = si.cache_vel_nb
-    
     # -------------likelihood part---------------
     
     # calc per part of like
@@ -273,16 +269,10 @@ def hierarch_like(p, prefix, prefix_nb, nsamp=1000, seed=12, min_per=0.1, max_pe
     NNper = scipy.stats.norm(meanper, stdper)
     pernorm = NNper.cdf(np.log10(max_per)) - NNper.cdf(np.log10(min_per))# normalization per truncated lognorm
     model_per = NNper.logpdf(np.log10(PER)) - np.log(pernorm) - np.log(PER * np.log(10))
-
-    # calc vel part of like
-    NNrv = scipy.stats.norm(meanvel, sigvel)
-    NNrv0 = scipy.stats.norm(0, DISP_PRIOR) # fiducial vel 
-    lrat_bin = NNrv.logpdf(VEL_bin) - NNrv0.logpdf(VEL_bin) # prior ratio binary
-    lrat_nbin = NNrv.logpdf(VEL_nbin) - NNrv0.logpdf(VEL_nbin) # prior ratio nonbinary
     
     # combined prior ratios
-    perpr1 = scipy.special.logsumexp(model_per - pi0_per + lrat_bin, axis=1) - np.log(nsamp)
-    perpr2 = scipy.special.logsumexp(lrat_nbin, axis=1) - np.log(nsamp)
+    perpr1 = scipy.special.logsumexp(model_per - pi0_per, axis=1) - np.log(nsamp)
+    perpr2 = 0 # nonbinary like
     
     # binary-nonbinary populations
     like1 = perpr1 + si.cache_logz + np.log(binfrac)
@@ -304,7 +294,7 @@ if __name__ == '__main__':
     parser.add_argument("--nstars", type=int, default=200, help="number of stars")
     parser.add_argument("--npt", type=int, default=4, help="number of observations per curve")
     parser.add_argument("--seed", type=int, default=123, help="random seed")
-    parser.add_argument("--par", nargs=5, type=float, default=None, help="number of observations per curve")
+    parser.add_argument("--par", nargs=3, type=float, default=None, help="number of observations per curve")
     parser.add_argument("--binary", action='store_true', help="do the binary samples")
     
     args = parser.parse_args()
@@ -315,19 +305,17 @@ if __name__ == '__main__':
     Nsamp = 1000
     min_per = 0.1
     max_per = 10
+    vel_mean = 0.0
+    vel_disp = DISP_PRIOR
     
     if args.par is None:
         mean_logper = 2.1
         std_logper = 2.0
         bin_frac = 0.5
-        vel_mean = 0.0
-        vel_disp = DISP_PRIOR
     else:
         mean_logper = args.par[0]
         std_logper = args.par[1]
         bin_frac = args.par[2]
-        vel_mean = args.par[3]
-        vel_disp = args.par[4]
 
     
     seed = args.seed
@@ -359,12 +347,11 @@ if __name__ == '__main__':
                          max_per=max_per,
                          mean_logper = mean_logper,
                          std_logper = std_logper,
-                         vel_mean=vel_mean,
                          vel_disp=vel_disp,
                          vel_err=vel_err, 
                          seed=seed)
     print('sampling \n')
-    with mp.Pool(mp.cpu_count()-3) as poo:
+    with mp.Pool(mp.cpu_count()-2) as poo:
         R = []
         for i in range(Nstars):
             cur_dat = S[i]

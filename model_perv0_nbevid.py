@@ -18,10 +18,12 @@ VREF = 30
 DISP_PRIOR = 100  # width of gaussian prior on velocity
 print(mp.cpu_count())
 
-def evid_nb(vels,
-            evels,
-            jitter=0.0,
-            zpt_prior_width=DISP_PRIOR):
+def nb_samp_evid(vels,
+                evels,
+                jitter=0.0,
+                zpt_prior_width=DISP_PRIOR,
+                rng = np.random.default_rng(), 
+                size=1):
     """
 
     Parameters:
@@ -42,11 +44,13 @@ def evid_nb(vels,
     # as a first step everything is divided by errors
     vels = vels / np.sqrt(evels**2 + jitter**2)
     II = 1. / np.sqrt(evels**2 + jitter**2)
-    logfrontmult = -np.log(zpt_prior_width) - 0.5 * np.log(evels**2 +
-                                                           jitter**2).sum()
     ITV = (II * vels).sum()
 
     norm = 1. / zpt_prior_width**2 + (1. / (evels**2 + jitter**2)).sum()
+    
+    # ----------------Evidence things----------------
+    logfrontmult = -np.log(zpt_prior_width) - 0.5 * np.log(evels**2 +
+                                                           jitter**2).sum()
     # this is the I^T I + 1/s^2 term
     VTZV = (vels**2).sum() - 1. / norm * ITV**2
     lnorm_nbin = -0.5 * np.log(norm) - 0.5 * VTZV + logfrontmult
@@ -54,8 +58,12 @@ def evid_nb(vels,
     # correction comes from dropping  1/sqrt(2pi ev**2) in the like and 
     # from dropping 1/sqrt(2pi)^n in binary model nb evid calc
     correction = -(- 0.5 * np.log(evels**2 + jitter**2).sum() - 0.5*np.log(2*np.pi))
+    evid = lnorm_nbin - len(vels) * 0.5 * np.log(2*np.pi)   + correction
+    # ------------------------------------------------
     
-    return lnorm_nbin - len(vels) * 0.5 * np.log(2*np.pi)   + correction
+    # return samples
+    samples = ITV/norm + rng.normal(size=size)/np.sqrt(norm)
+    return samples, evid
 
 def make_samp(Nstars,
               Npt,
@@ -74,12 +82,12 @@ def make_samp(Nstars,
     
     per = 10**(rng.normal(mean_logper,std_logper, size=Nstars*100) )
     per = per[(per>min_per)& (per<max_per)][:Nstars]
+    v0 = rng.normal(size=Nstars) * vel_disp + vel_mean\
     
     #per = 10**rng.uniform(np.log10(min_per), np.log10(max_per), size=Nstars)
-    phase = rng.uniform(0, 2 * np.pi, size=Nstars)
-    v0 = rng.normal(size=Nstars) * vel_disp + vel_mean
-    cosi = rng.uniform(0, 1, size=Nstars)
-    sini = np.sqrt(1 - cosi**2)
+    phase = np.ones_like(per) *0.0 #rng.uniform(0, 2 * np.pi, size=Nstars)
+    #cosi = rng.uniform(0, 1, size=Nstars)
+    sini = np.ones_like(per) * 1.0 #np.sqrt(1 - cosi**2)
     amp0 = VREF / per**(1. / 3) * sini
     res = []
     is_bin = (rng.uniform(0, 1, size=Nstars) < bin_frac).astype(int)
@@ -107,33 +115,22 @@ class Prior:
         x1 = x * 0
         x1[0] = V
         x1[1] = per
-        x1[2] = x[2] * 2 * np.pi # phase
-        x1[3] = np.sqrt(1 - x[3]**2)  # sini
-        return x1
-
-
-class PriorNB:
-
-    def __init__(self, vel_sig):
-        self.MINV = -1000
-        self.vel_sig = vel_sig
-
-    def __call__(self, x):
-        V = scipy.special.ndtri(x[0]) * self.vel_sig
-        x1 = x * 0
-        x1[0] = V
+        #x1[2] = x[2] * 2 * np.pi # phase
+        #x1[3] = np.sqrt(1 - x[3]**2)  # sini
         return x1
 
 
 def like(p, data):
     t, v, ev, bin_switch = data
     if bin_switch:
-        v0, per, phase, sini = p
+        v0, per = p
+        sini = 1 # set sini=1
+        phase = 0 # set phase = 0
     else:
         v0 = p[0]
         per, phase = 1, 0
         sini = 0
-    amp0 = VREF / per**(1. / 3) * sini
+    amp0 = VREF / per**(1. / 3) * sini 
     model = amp0 * np.sin(2 * np.pi / per * t - phase) + v0
     logl = -0.5 * np.sum(((model - v) / ev)**2) # dropped 1/sqrt(2pi ev**2)
     return logl
@@ -142,40 +139,34 @@ def like(p, data):
 def posterior(t, v, ev, binary, minp=None, maxp=None, seed=1):
     if binary:
         pri = Prior(DISP_PRIOR, minp, maxp)
-        ndim = 4
-        periodic = [2]
-        evid_analytic=None
-    else:
-        pri = PriorNB(DISP_PRIOR, )
-        ndim = 1
-        periodic = None
-        # use analytical form of the evidence
-        evid_analytic = evid_nb(v,ev)
-        
-    data = ((t, v, ev, binary), )
+        ndim = 2
+        periodic = None #[2]
 
-    rng = np.random.default_rng(seed)
-    nlive = 1000
-    dns = dynesty.DynamicNestedSampler(like,
-                                       pri,
-                                       ndim,
-                                       rstate=rng,
-                                       nlive=nlive,
-                                       bound='multi',
-                                       sample='rslice',
-                                       periodic=periodic,
-                                       logl_args=data)
-    # dns.run_nested(n_effective=10000, print_progress=False)
-    print_progress = False
-    dns.run_nested(n_effective=10000,print_progress=print_progress)  #, maxbatch=1)
-    # for i in range(10):
-    #    dns.add_batch(mode='full')
-    res = dns.results.samples_equal()
-    
-    if evid_analytic is None:
+        data = ((t, v, ev, binary), )
+
+        rng = np.random.default_rng(seed)
+        nlive = 1000
+        dns = dynesty.DynamicNestedSampler(like,
+                                           pri,
+                                           ndim,
+                                           rstate=rng,
+                                           nlive=nlive,
+                                           bound='multi',
+                                           sample='rslice',
+                                           periodic=periodic,
+                                           logl_args=data)
+        # dns.run_nested(n_effective=10000, print_progress=False)
+        print_progress = False
+        dns.run_nested(n_effective=10000,print_progress=print_progress)  #, maxbatch=1)
+        # for i in range(10):
+        #    dns.add_batch(mode='full')
+        res = dns.results.samples_equal()
         logz = dns.results.logz[-1]
+    
     else:
-        logz = evid_analytic
+        # use analytical form of the evidence
+        res, logz = nb_samp_evid(v,ev, size=(10000,1))
+        
         
     return res, logz
 
@@ -255,7 +246,7 @@ def hierarch_like(p, prefix, prefix_nb, nsamp=1000, seed=12, min_per=0.1, max_pe
         si.cache_dat_nb = dat
         si.cache_truep_nb = truep
         
-        # do the permutation and save
+        # do the permutation (doesn't really matter here) and save
         si.cache_vel_nb = ARR_vel[np.arange(ARR.shape[0])[:, None] +permut * 0, permut]
         
         si.prefixes=[prefix, prefix_nb]
@@ -304,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument("--nstars", type=int, default=200, help="number of stars")
     parser.add_argument("--npt", type=int, default=4, help="number of observations per curve")
     parser.add_argument("--seed", type=int, default=123, help="random seed")
-    parser.add_argument("--par", nargs=5, type=float, default=None, help="number of observations per curve")
+    parser.add_argument("--par", nargs=5, type=float, default=None, help="true parameters")
     parser.add_argument("--binary", action='store_true', help="do the binary samples")
     
     args = parser.parse_args()
@@ -364,7 +355,7 @@ if __name__ == '__main__':
                          vel_err=vel_err, 
                          seed=seed)
     print('sampling \n')
-    with mp.Pool(mp.cpu_count()-3) as poo:
+    with mp.Pool(mp.cpu_count()-2) as poo:
         R = []
         for i in range(Nstars):
             cur_dat = S[i]

@@ -27,6 +27,7 @@ def make_samp(Nstars,
               max_per=10,
               mean_logper = 2.4,
               std_logper = 2.28,
+              vel_mean=0.0,
               vel_disp=5,
               vel_err=0.5,
               seed=44):
@@ -37,7 +38,7 @@ def make_samp(Nstars,
     
     #per = 10**rng.uniform(np.log10(min_per), np.log10(max_per), size=Nstars)
     phase = rng.uniform(0, 2 * np.pi, size=Nstars)
-    v0 = rng.normal(size=Nstars) * vel_disp
+    v0 = rng.normal(size=Nstars) * vel_disp + vel_mean
     cosi = rng.uniform(0, 1, size=Nstars)
     sini = np.sqrt(1 - cosi**2)
     amp0 = VREF / per**(1. / 3) * sini
@@ -270,7 +271,7 @@ if __name__ == '__main__':
     if args.par is None:
         mean_logper = 2.1
         std_logper = 2.0
-        bin_frac = 0.6
+        bin_frac = 0.5
         vel_mean = 0.0
         vel_disp = DISP_PRIOR
     else:
@@ -288,7 +289,7 @@ if __name__ == '__main__':
         os.mkdir(path)
     except:
         pass
-    print(path, mean_logper, std_logper, vel_disp, bin_frac)
+    print(path, mean_logper, std_logper, bin_frac, vel_mean, vel_disp)
     
     #binary_model = True
     #binary_model = False
@@ -309,11 +310,12 @@ if __name__ == '__main__':
                          max_per=max_per,
                          mean_logper = mean_logper,
                          std_logper = std_logper,
+                         vel_mean=vel_mean,
                          vel_disp=vel_disp,
                          vel_err=vel_err, 
                          seed=seed)
     print('sampling \n')
-    with mp.Pool(mp.cpu_count()-2) as poo:
+    with mp.Pool(mp.cpu_count()-3) as poo:
         R = []
         for i in range(Nstars):
             cur_dat = S[i]
