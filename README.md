@@ -1,5 +1,12 @@
 # hierarch_sines
+Example of how to run:
+```
+python model_lognormper_nbevid.py --name sines_N1000_1pt --headfolder ~/samples/ --npt 1 --nstars 1000 --seed 456 # generates curves from given params and seeds and samples non-binary posterior
+python model_lognormper_nbevid.py --name sines_N1000_1pt --headfolder ~/samples/ --npt 1 --nstars 1000 --seed 456 --binary # generates curves from given params and seeds and samples binary posterior
+python hierarch_lognormper.py --folder ~/samples/ --name sines_N1000_1pt_seed456 # MCMC to sample hierarchical likelihood using the binary and non-binary posterior samples
+```
 
+### Scripts
 model_perbf_nbevid.py + hierarch_perbf.py - Infer period dist and binfrac
 
 model_lognormper.py + hierarch_lognormper.py - Infer period dist, binfrac, and vel dist
