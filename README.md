@@ -5,6 +5,7 @@ $ python model_lognormper_nbevid.py --name sines_N1000_1pt --headfolder ~/sample
 $ python model_lognormper_nbevid.py --name sines_N1000_1pt --headfolder ~/samples/ --npt 1 --nstars 1000 --seed 456 --binary # generates curves from given params and seeds and samples binary posterior
 $ python hierarch_lognormper.py --folder ~/samples/ --name sines_N1000_1pt_seed456 # MCMC to sample hierarchical likelihood using the binary and non-binary posterior samples
 ```
+**Note**:  hierarch_lognormper.py will save a file "chain_{name}.pkl" with the MCMC chain in it.
 
 ### Scripts
 model_perbf_nbevid.py + hierarch_perbf.py - Infer period dist and binfrac
