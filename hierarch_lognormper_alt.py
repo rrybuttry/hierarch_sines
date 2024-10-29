@@ -8,9 +8,11 @@ import argparse
 import pickle
 
 
-def dosamp(name, path):
+def dosamp(name, path, outname=None):
     
-    
+    if outname is None:
+        outname = name
+        
     args = (path + '/'+name+'/bin', path + '/'+name+'/nb')
     like_func = model_lognormper_nbevid_alt.hierarch_like
 
@@ -51,7 +53,7 @@ def dosamp(name, path):
     #              labels=['mlogp', 'slogp', 'bfrac', 'vel', 'disp'])
     #plt.savefig('chain.png')
     
-    with open(path+'/chain_%s.pkl'%name, 'wb') as f:
+    with open(path+'/chain_%s.pkl'%outname, 'wb') as f:
         pickle.dump(es.chain[:, 0:, :].reshape(-1, ndim), f)
 
 
@@ -59,7 +61,8 @@ if __name__ == '__main__':
     # start argparsing
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, help="name of dataset")
-    parser.add_argument("--folder", type=str, help="what folder are the binary param samples stored in (absolute path)? emcee chain is saved in folder right above it")    
+    parser.add_argument("--folder", type=str, help="what folder are the binary param samples stored in (absolute path)? emcee chain is saved in folder right above it")   
+    parser.add_argument("--outname", type=str, default=None, help="output")   
     args = parser.parse_args()
     
-    dosamp(name=args.name, path=args.folder)
+    dosamp(name=args.name, path=args.folder, outname=args.outname)
