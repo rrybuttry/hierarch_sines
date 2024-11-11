@@ -200,7 +200,7 @@ def hierarch_like(p, prefix, prefix_nb, nsamp=1000, seed=12, min_per=0.1, max_pe
     #meanper,  binfrac = p
     meanper, stdper, binfrac, meanvel, sigvel = p
     
-    if binfrac>=1 or binfrac<=0 or np.abs(meanper)>10 or stdper<0 or stdper > 10:
+    if binfrac>=1 or binfrac<=0 or np.abs(meanper)>5 or stdper<0 or stdper > 5:
         return -1e100
     
     # load both bin and nb samps and logz's
